@@ -6,7 +6,7 @@ from PyQt5.QtGui import QColor
 
 
 EXTENSION_ID = "pykrita_export_groups_as_jpg"
-MENU_ENTRY = "OFM Export Groups as JPG"
+MENU_ENTRY = "2 OFM Export Groups as JPG"
 # export_path = os.path.expanduser("~/Desktop/KritaExports")  # Change path as needed
 
 """
@@ -56,34 +56,17 @@ class Export_groups_as_jpg(Extension):
 
     def wait_for_krita(self, doc, sleep_time=0.1):
         doc.waitForDone()
-        time.sleep(sleep_time)
+        # time.sleep(sleep_time)
 
     def set_visibility_recursively(self, node, visible, doc):
         node.setVisible(visible)
-        self.wait_for_krita_then_refresh(doc)
+        self.wait_for_krita(doc)
         for child in node.childNodes():
             self.set_visibility_recursively(child, visible, doc)
 
     def set_visibility(self, node, visible, doc):
         node.setVisible(visible)
-        self.wait_for_krita_then_refresh(doc)
-
-    def duplicate_and_flatten_group2(self, doc, group_node):
-        # Duplicate group
-        duplicated = group_node.duplicate()
-        doc.rootNode().addChildNode(duplicated, None)
-
-        # Flatten duplicated group
-        doc.setActiveNode(duplicated)
-        self.wait_for_krita(doc=doc)
-        Krita.instance().action("flatten_layer").trigger()
-        self.wait_for_krita(doc=doc)
-
-        # Hide current group
-        self.set_visibility(group_node, False, doc)
-
-        # The duplicate is now a flattened paint layer
-        return duplicated
+        self.wait_for_krita(doc)
 
     def duplicate_flatten_then_save_group(
         self, doc, group_node, export_file, jpgOptions
@@ -99,9 +82,9 @@ class Export_groups_as_jpg(Extension):
 
         # Select and flatten
         doc.setActiveNode(duplicated_node)
-        self.wait_for_krita(doc=doc)
+        self.wait_for_krita_then_refresh(doc=doc)
         Krita.instance().action("flatten_layer").trigger()
-        self.wait_for_krita(doc=doc)
+        self.wait_for_krita_then_refresh(doc=doc)
 
         # Export the flattened image
         doc.setBatchmode(True)  # Suppress dialog box
@@ -111,7 +94,21 @@ class Export_groups_as_jpg(Extension):
             print(f"Failed to export {export_file}")
 
     def export_groups_as_jpg(self):
+        if (
+            QMessageBox.question(
+                None,
+                "Exporting All Groups as Jpg!!",
+                "Do you want to continue?",
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            == QMessageBox.No
+        ):
+            return
+
         doc = Krita.instance().activeDocument()
+        if not doc:
+            QMessageBox.warning(None, "Error", "No active document found!")
+            return
 
         # progress bar
         total_groups = sum(
@@ -121,10 +118,6 @@ class Export_groups_as_jpg(Extension):
         progress.setWindowTitle("Batch Export")
         progress.setWindowModality(Qt.WindowModal)
         progress.show()
-
-        if not doc:
-            QMessageBox.warning(None, "Error", "No active document found!")
-            return
 
         # ask for export path
         export_path = QFileDialog.getExistingDirectory(
