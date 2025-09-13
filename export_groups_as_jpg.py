@@ -93,6 +93,30 @@ class Export_groups_as_jpg(Extension):
         if not saved:
             print(f"Failed to export {export_file}")
 
+    def save_as_kra_dialog(self, doc, start_directory=""):
+        if not doc:
+            QMessageBox.warning(None, "Error", "No document to save!")
+            return
+
+        # Get save path from dialog
+        file_path, _ = QFileDialog.getSaveFileName(
+            Krita.instance().activeWindow().qwindow(),
+            "Save Krita Document",
+            "",
+            "Krita Files (*.kra);;All Files (*)",
+        )
+
+        if file_path:
+            # Ensure .kra extension
+            if not file_path.lower().endswith(".kra"):
+                file_path += ".kra"
+
+            success = doc.saveAs(file_path)
+            if success:
+                QMessageBox.information(None, "Success", f"Saved as: {file_path}")
+            else:
+                QMessageBox.critical(None, "Error", "Save failed!")
+
     def export_groups_as_jpg(self):
         if (
             QMessageBox.question(
@@ -110,6 +134,47 @@ class Export_groups_as_jpg(Extension):
             QMessageBox.warning(None, "Error", "No active document found!")
             return
 
+        self.wait_for_krita_then_refresh(doc)
+
+        # file name
+        kra_full_path = doc.fileName()  # Full path to the .kra file
+        kra_file_name = os.path.basename(kra_full_path)  # Just the file name
+
+        # start directory
+        start_directory = ""
+        if "ink" in kra_file_name:
+            start_directory = (
+                "C:\\PROJECTS\\Tee_Companies\\02_Ink Coton LLC Ebru\\1WORK\\1OUTPUT"
+            )
+        elif "pn" in kra_file_name:
+            start_directory = (
+                "C:\\PROJECTS\\Tee_Companies\\01_Play Nexus LLC OFM\\0work\\1output"
+            )
+        else:
+            start_directory = ""
+
+        # save orginal file first
+        self.save_as_kra_dialog(doc, start_directory)
+        self.wait_for_krita_then_refresh(doc)
+
+        # ask for export path
+        export_path = QFileDialog.getExistingDirectory(
+            None,  # parent widget (None = main window)
+            "Select Export Folder",  # dialog title
+            start_directory,  # starting directory ("" = last used)
+            QFileDialog.ShowDirsOnly,  # only allow selecting folders
+        )
+        if not export_path:
+            QMessageBox.warning(None, "Error", "No export path found!")
+            return
+
+        # jpg export folder path
+        export_path = os.path.join(export_path, kra_file_name)
+
+        # Ensure export folder exists
+        if not os.path.exists(export_path):
+            os.makedirs(export_path)
+
         # progress bar
         total_groups = sum(
             1 for node in doc.rootNode().childNodes() if node.type() == "grouplayer"
@@ -118,25 +183,6 @@ class Export_groups_as_jpg(Extension):
         progress.setWindowTitle("Batch Export")
         progress.setWindowModality(Qt.WindowModal)
         progress.show()
-
-        # ask for export path
-        export_path = QFileDialog.getExistingDirectory(
-            None,  # parent widget (None = main window)
-            "Select Export Folder",  # dialog title
-            "",  # starting directory ("" = last used)
-            QFileDialog.ShowDirsOnly,  # only allow selecting folders
-        )
-        if not export_path:
-            QMessageBox.warning(None, "Error", "No export path found!")
-            return
-
-        kra_full_path = doc.fileName()  # Full path to the .kra file
-        kra_file_name = os.path.basename(kra_full_path)  # Just the file name
-        export_path = os.path.join(export_path, kra_file_name)
-
-        # Ensure export folder exists
-        if not os.path.exists(export_path):
-            os.makedirs(export_path)
 
         # Hide all groups first
         for n in doc.rootNode().childNodes():
