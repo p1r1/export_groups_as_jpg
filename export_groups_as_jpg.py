@@ -48,13 +48,13 @@ class Export_groups_as_jpg(Extension):
         action = window.createAction(EXTENSION_ID, MENU_ENTRY, "tools/scripts")
         action.triggered.connect(self.export_groups_as_jpg)
 
-    def wait_for_krita_then_refresh(self, doc, sleep_time=0.1):
-        doc.waitForDone()
-        doc.refreshProjection()
+    def wait_for_krita_then_refresh(self, doc, sleep_time=0.01):
+        # doc.waitForDone()
+        # doc.refreshProjection()
         doc.waitForDone()
         time.sleep(sleep_time)
 
-    def wait_for_krita(self, doc, sleep_time=0.1):
+    def wait_for_krita(self, doc, sleep_time=0.01):
         doc.waitForDone()
         # time.sleep(sleep_time)
 
@@ -87,6 +87,7 @@ class Export_groups_as_jpg(Extension):
         self.wait_for_krita_then_refresh(doc=doc)
 
         # Export the flattened image
+        self.wait_for_krita(doc=doc)
         doc.setBatchmode(True)  # Suppress dialog box
         saved = doc.exportImage(export_file, jpgOptions)
         self.wait_for_krita(doc=doc)
@@ -102,7 +103,7 @@ class Export_groups_as_jpg(Extension):
         file_path, _ = QFileDialog.getSaveFileName(
             Krita.instance().activeWindow().qwindow(),
             "Save Krita Document",
-            "",
+            start_directory,
             "Krita Files (*.kra);;All Files (*)",
         )
 
@@ -139,6 +140,7 @@ class Export_groups_as_jpg(Extension):
         # file name
         kra_full_path = doc.fileName()  # Full path to the .kra file
         kra_file_name = os.path.basename(kra_full_path)  # Just the file name
+        kra_folder = os.path.dirname(kra_full_path)  # Folder containing the .kra file
 
         # start directory
         start_directory = ""
@@ -154,7 +156,7 @@ class Export_groups_as_jpg(Extension):
             start_directory = ""
 
         # save orginal file first
-        self.save_as_kra_dialog(doc, start_directory)
+        self.save_as_kra_dialog(doc, kra_folder)
         self.wait_for_krita_then_refresh(doc)
 
         # ask for export path
@@ -188,6 +190,7 @@ class Export_groups_as_jpg(Extension):
         for n in doc.rootNode().childNodes():
             if n.type() == "grouplayer":
                 self.set_visibility(n, False, doc)
+        self.wait_for_krita(doc)
 
         # save options
         color = QColor("#ffffff")  # Background fill color (white)
@@ -227,6 +230,11 @@ class Export_groups_as_jpg(Extension):
             progress.setValue(progress.value() + 1)
             QApplication.processEvents()
             time.sleep(0.2)
+
+        # progress cancel
+        if progress.wasCanceled():
+            QMessageBox.information(None, "Cancelled", "Export cancelled by user.")
+            return  # Exit the loop immediately
 
         # progress
         progress.close()
